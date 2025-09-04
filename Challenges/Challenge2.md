@@ -1,6 +1,6 @@
 Brute force attack .
 
-# I've been given both pcap aswell as an authentication log to analyze a brute force attack.
+# I've been given both pcap aswell as an authentication log to analyze a brute force attack
 
 ![A screenshot of a computer AI-generated content may be
 incorrect.](media1/media/media2/media/image1.png)
