@@ -3,7 +3,7 @@ Brute force attack .
 # I've been given both pcap aswell as an authentication log to analyze a brute force attack.
 
 ![A screenshot of a computer AI-generated content may be
-incorrect.](media1/media/media1/media/media2/media/image1.png)
+incorrect.](media1/media/media2/media/image1.png)
 
 Up until log no 122 I can see a user with Ip 196.136.60.15 having
 multiple authentication sessions to the root user .
