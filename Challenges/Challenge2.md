@@ -5,25 +5,19 @@ Brute force attack .
 ![A screenshot of a computer AI-generated content may be
 incorrect.](media1/media/media2/media/image1.png)
 
-Up until log no 122 I can see a user with Ip 196.136.60.15 having
-multiple authentication sessions to the root user .
+Up until log entry 122, I can see the user with IP 196.136.60.15 having multiple successful authentication sessions to the root account. After that point, things change, there are repeated authentication failures coming from IP 141.98.10.105. The number of failures and the frequency of the session closures look unusual, like someone is hammering the login.
 
-But then I see multiple authentication failures from an Ip 141.98.10.105
-, An unsual amounts of time that the session gets closed . Don't see
-anything suspicious on network logs so its probably an internal Ip .
+Even with those repeated failures, I don’t see any obvious suspicious activity in the rest of the network logs. That makes me think this is probably an internal IP generating noise rather than an external attacker who broke in.
 
 ![A screenshot of a computer AI-generated content may be
 incorrect.](media1/media/media2/media/image2.png)
 
-And parallely in network logs the IP 192.168.190.137 is attempting for
-an RDP to 51.116.96.181 multiple times aswell so we will look for the
-same ip in the auth logs.
+In parallel with the authentication activity, I can see in the network logs that IP 192.168.190.137 is making repeated RDP attempts to 51.116.96.181. Since the behavior looks persistent, the next step is to check for the same IP in the authentication logs to see if there’s any overlap or evidence of brute force activity there as well.
 
 ![A screenshot of a computer AI-generated content may be
 incorrect.](media1/media/media2/media/image3.png)
 
-Also see that its successful as packets are being exchanged so the
-server compromised here is definitely 51.116.96.181 .
+I can also see that the RDP attempts from 192.168.190.137 to 51.116.96.181 were eventually successful since packets are being exchanged between them. That means the server that ended up compromised in this case is definitely 51.116.96.181.
 
 ![A screen shot of a computer AI-generated content may be
 incorrect.](media1/media/media2/media/image4.png)
@@ -31,56 +25,50 @@ incorrect.](media1/media/media2/media/image4.png)
 ![A blue and white rectangle with white text AI-generated content may be
 incorrect.](media1/media/media2/media/image5.png)
 
-To answer this question we filter the wireshark for http requests as it
-is the only way to target a specific server directory .
-
-Let us check whats going on .
+To answer this part I’ll filter Wireshark for HTTP requests, since that’s the only way to see what’s happening with a specific server directory. Once filtered, I can check the requests in detail and figure out what exactly is going on.
 
 ![A screenshot of a computer AI-generated content may be
 incorrect.](media1/media/media2/media/image6.png)
 
-Multiple post requests to the directory index.php so probably its
-targeting that to authenticate .
-
-We can confirm it through the http/1.1 request that
+I can see multiple POST requests hitting index.php, so it looks like the attacker is targeting that directory to authenticate. This makes sense because POST is commonly used to send login credentials. We can confirm this by looking at the full HTTP/1.1 request, which should show the parameters being passed to index.php
 
 ![A screenshot of a computer AI-generated content may be
 incorrect.](media1/media/media2/media/image7.png)
 
-Just to confirm . Used statistics + http as well as statistics end
-points .
+To double-check this, I also used Statistics → HTTP and Statistics → Endpoints in Wireshark. That confirmed the repeated POST activity against index.php, lining up with what I saw earlier in the filtered traffic.
+
+This way you’re not just relying on the filter, you’re backing it up with Wireshark’s built-in statistics to confirm the pattern.
 
 ![A blue and white rectangle with white text AI-generated content may be
 incorrect.](media1/media/media2/media/image8.png)
 
-To answer this question we need to analyze the HTTP/POST
+To answer this question I need to dig into the HTTP POST requests directly. Looking at the POST payload will show what parameters are being sent to index.php, which should confirm if the attacker is actually trying to authenticate or brute force login credentials.
 
 ![A screenshot of a computer AI-generated content may be
 incorrect.](media1/media/media2/media/image9.png)
 
-Confirms that its actually posting a series of username and password .
-
-Now whether its correct or wrong can be seen in the response .
+The POST requests confirm that a series of usernames and passwords are being sent to index.php. Whether each attempt is correct or not can be checked by looking at the HTTP response. A successful login would show a different response code or a change in the server’s reply compared to the failed ones.
 
 ![A screenshot of a computer AI-generated content may be
 incorrect.](media1/media/media2/media/image10.png)
 
-For every wrong combination we get the incorrect response in red . For
-the correct one the response would be correct right ?
+For every wrong username and password combination the server throws back an “incorrect” response, which shows up in red in Wireshark. When the credentials are valid, the server instead replies with the correct response, confirming that the login succeeded.
 
-I didn't know how to apply a filter for text like this . I used external
-help and found out that .
+At first I didn’t know how to apply a text-based filter to highlight these responses. I had to get some external help and found the right way to filter for HTTP response content inside Wireshark. That let me separate the failed login attempts from the successful one and confirm how the brute force actually played out.
 
 ![A screenshot of a computer AI-generated content may be
 incorrect.](media1/media/media2/media/image11.png)
 
-This is how we do it is what I've learnt .
+What I’ve taken away from this exercise is simple. This is how brute force over HTTP actually looks in real traffic. You see the repeated POSTs with different username and password combinations, the incorrect responses for the bad ones, and the single correct response when the attacker finally lands on valid credentials.
 
 ![A screenshot of a computer AI-generated content may be
 incorrect.](media1/media/media2/media/image12.png)
 
-So the post request before this would have the correct username and
-password combination .
+When you look at the sequence of POSTs in Wireshark:
+
+The failed ones show the “incorrect” message in the HTTP response.
+
+The last failed attempt is followed by the successful POST, where the server replies differently (often a 200 OK with a redirect, a session cookie, or some content that proves authentication worked). .
 
 ![A screenshot of a computer AI-generated content may be
 incorrect.](media1/media/media2/media/image13.png
@@ -88,14 +76,14 @@ incorrect.](media1/media/media2/media/image13.png
 ![A blue and white text AI-generated content may be
 incorrect.](media1/media/media2/media/image14.png)
 
-We've got the right combination .
+We’ve got the right username and password combination. The sequence of POST requests confirmed it ,all the earlier ones failed with “incorrect” responses, but this one came back clean from the server. That makes it the valid login and proves the brute force attempt worked.
+
+In a SOC context this would be treated as a confirmed true positive, mapped to MITRE ATT&CK T1110 (Brute Force) and T1078 (Valid Accounts), and moved into containment and response since a real compromise has been shown.
 
 ![A screenshot of a computer AI-generated content may be
 incorrect.](media1/media/media2/media/image15.png)
 
-Its basically the no of attempted password logins for different
-usernames so we need to segregate out the post request by applying a
-filter like this .
+It’s basically the number of attempted logins with different usernames. To see this clearly we need to separate the POST requests by applying the right filter in Wireshark. That way only the POST traffic shows up, and we can go through each login attempt without the rest of the noise.
 
 ![A screenshot of a computer AI-generated content may be
 incorrect.](media1/media/media2/media/image16.png)
@@ -106,7 +94,7 @@ incorrect.](media1/media/media2/media/image17.png)
 ![A screenshot of a computer AI-generated content may be
 incorrect.](media1/media/media2/media/image18.png)
 
-We'll just export it outside and use some linux commands .
+Instead of trying to handle everything inside Wireshark, I exported the HTTP POST traffic out and worked on it with some basic Linux commands. This made it easier to parse through the requests, count the login attempts, and quickly spot the usernames and password combinations being tested without scrolling through the capture manually.
 
 ![A screenshot of a computer AI-generated content may be
 incorrect.](media1/media/media2/media/image19.png)
@@ -119,8 +107,7 @@ incorrect.](media1/media/media2/media/image20.png)
 ![A screenshot of a computer AI-generated content may be
 incorrect.](media1/media/media2/media/image21.png)
 
-To find anything from a request or anything other than the given fields
-we will search it using the the second filter .
+To find anything specific inside a request, or details beyond the usual fields shown, I used a second filter in Wireshark. This lets me search directly for the string or value I’m after instead of digging through every field manually. With the right display filter applied, I can isolate things like parameters, usernames, or response text and confirm if they show up in the traffic. .
 
 ![A screenshot of a computer AI-generated content may be
 incorrect.](media1/media/media2/media/image22.png)
@@ -128,7 +115,7 @@ incorrect.](media1/media/media2/media/image22.png)
 ![A blue and white screen AI-generated content may be
 incorrect.](media1/media/media2/media/image23.png)
 
-For the next question
+Alright, let’s continue with the next question .
 
 ![A screenshot of a computer AI-generated content may be
 incorrect.](media1/media/media2/media/image24.png)
@@ -139,7 +126,7 @@ incorrect.](media1/media/media2/media/image25.png)
 ![A blue and white text AI-generated content may be
 incorrect.](media1/media/media2/media/image26.png)
 
-As he asked for the latest so we scrolled through to find the answer .
+Since the question asked for the latest activity, I just scrolled through the capture to the end and found the answer there. That way I could confirm the most recent event instead of only looking at the earlier packets.
 
 ![A screenshot of a computer AI-generated content may be
 incorrect.](media1/media/media2/media/image27.png)
@@ -156,7 +143,9 @@ incorrect.](media1/media/media2/media/image30.png)
 ![A screenshot of a computer AI-generated content may be
 incorrect.](media1/media/media2/media/image31.png)
 
-Clearly it's a brute force so we'll find the mitre id for it .
+This traffic is a brute force attempt. The repeated POST requests with different usernames and passwords confirm it. According to MITRE ATT&CK, this falls under T1110 (Brute Force). Once a valid login is found and abused, it also matches T1078 (Valid Accounts).
+
+From a NIST 800-61 incident handling perspective, this sits in the detection and analysis phase. The evidence is clear enough to mark the event as a confirmed incident. The next steps, per NIST, would be to move into containment and eradication by blocking the malicious IP, cutting off further login attempts, and resetting or monitoring the compromised account.
 
 ![A blue rectangular object with a black stripe AI-generated content may
 be incorrect.](media1/media/media2/media/image32.png)
